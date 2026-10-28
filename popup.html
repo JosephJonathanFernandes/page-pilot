@@ -46,6 +46,7 @@
         <div class="section-actions">
           <button id="copySummaryBtn" class="mini-btn" title="Copy summary">Copy</button>
           <button id="speakSummaryBtn" class="mini-btn" title="Speak summary">Speak</button>
+          <button id="visualBtn" class="mini-btn" title="Describe page visually (screenshot)">Visual</button>
           <button id="stopSpeakBtn" class="mini-btn" title="Stop speaking">Stop</button>
         </div>
       </div>
@@ -113,6 +114,21 @@
       </div>
 
       <div class="field-group">
+        <label for="languageSelect">Summary language</label>
+        <select id="languageSelect" class="input-field">
+          <option value="auto">Auto (match page)</option>
+          <option value="English">English</option>
+          <option value="Spanish">Spanish</option>
+          <option value="French">French</option>
+          <option value="German">German</option>
+          <option value="Hindi">Hindi</option>
+          <option value="Chinese">Chinese</option>
+          <option value="Japanese">Japanese</option>
+          <option value="Arabic">Arabic</option>
+        </select>
+      </div>
+
+      <div class="field-group">
         <label for="voiceSelect">Voice</label>
         <select id="voiceSelect" class="input-field"></select>
       </div>
@@ -161,8 +177,9 @@
     </section>
 
     <footer class="footer">
+      <button id="readPageBtn" class="footer-btn">Read page</button>
       <button id="historyBtn" class="footer-btn">History</button>
-      <span class="footer-note">Page Pilot v2.0</span>
+      <span class="footer-note">Page Pilot v2.1</span>
     </footer>
   </div>
   <script src="popup.js"></script>

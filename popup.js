@@ -14,7 +14,8 @@ const state = {
     maxElements: 80,
     highlightDuration: 2500,
     autoScan: false,
-    theme: 'dark'
+    theme: 'dark',
+    language: 'auto'
   },
   elements: [],
   page: null,
@@ -121,6 +122,7 @@ function bindUI() {
 
   $('modelSelect').addEventListener('change', (e) => { state.settings.model = e.target.value; saveSettings(); });
   $('styleSelect').addEventListener('change', (e) => { state.settings.style = e.target.value; saveSettings(); });
+  $('languageSelect').addEventListener('change', (e) => { state.settings.language = e.target.value; saveSettings(); });
   $('voiceSelect').addEventListener('change', (e) => { state.settings.voiceName = e.target.value; saveSettings(); });
   $('rateRange').addEventListener('input', (e) => {
     state.settings.rate = parseFloat(e.target.value);
@@ -159,7 +161,9 @@ function bindUI() {
 
   $('copySummaryBtn').addEventListener('click', () => copyText(state.summary));
   $('speakSummaryBtn').addEventListener('click', () => { if (state.summary) readAloud(state.summary); });
+  $('visualBtn').addEventListener('click', visualSummary);
   $('stopSpeakBtn').addEventListener('click', stopSpeaking);
+  $('readPageBtn').addEventListener('click', readPageAloud);
 
   $('filterInput').addEventListener('input', (e) => { state.search = e.target.value.trim().toLowerCase(); renderElements(); });
   $('exportBtn').addEventListener('click', exportJson);
@@ -180,6 +184,7 @@ function syncSettingsUI() {
   $('apiKeyInput').value = state.settings.apiKey || '';
   $('modelSelect').value = state.settings.model;
   $('styleSelect').value = state.settings.style;
+  $('languageSelect').value = state.settings.language || 'auto';
   $('rateRange').value = state.settings.rate;
   $('rateValue').textContent = Number(state.settings.rate).toFixed(1);
   $('maxElementsInput').value = state.settings.maxElements;
@@ -289,6 +294,10 @@ async function scan() {
     state.search = '';
     $('filterInput').value = '';
     $('badge').textContent = elements.length;
+    try {
+      chrome.action.setBadgeText({ text: String(elements.length) });
+      chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+    } catch (e) {}
 
     if (elements.length === 0) {
       setStatus('No interactive elements found.');
@@ -435,6 +444,7 @@ Write a helpful spoken summary:
 - Then up to 5 important actions the user can take.
 - Mention forms/inputs if relevant.
 - ${STYLE_INSTRUCTIONS[state.settings.style] || STYLE_INSTRUCTIONS.concise}
+- ${state.settings.language && state.settings.language !== 'auto' ? 'Respond in ' + state.settings.language + '.' : ''}
 - Plain text only. No markdown, no code fences.`;
 
   const res = await makeApiCall(key, state.settings.model, prompt);
@@ -519,6 +529,99 @@ function readAloud(text) {
   window.speechSynthesis.speak(utterance);
 }
 
+// ---------- Visual summary ----------
+async function visualSummary() {
+  if (!state.settings.apiKey) { setStatus('Add an API key first.'); return; }
+  const tab = await getCurrentTab();
+  if (!tab || !tab.id) { setStatus('No active tab.'); return; }
+  setStatus('Capturing screenshot…');
+  let dataUrl;
+  try {
+    dataUrl = await new Promise((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' }, (url) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(url);
+      });
+    });
+  } catch (e) {
+    setStatus('Screenshot failed: ' + (e && e.message ? e.message : e));
+    return;
+  }
+  const base64 = (dataUrl || '').split(',')[1];
+  if (!base64) { setStatus('Screenshot failed.'); return; }
+  setStatus('Describing visuals…');
+  try {
+    const text = await generateVisualSummary(base64);
+    const addition = 'Visual: ' + text;
+    state.summary = state.summary ? state.summary + '\\n\\n' + addition : addition;
+    $('summaryText').textContent = state.summary;
+    $('summaryContainer').style.display = 'block';
+    setStatus('Visual description added.');
+    if (state.settings.voiceEnabled) readAloud(text);
+    saveLastScan();
+  } catch (err) {
+    setStatus('Visual summary failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+async function generateVisualSummary(base64) {
+  const key = state.settings.apiKey;
+  const lang = state.settings.language && state.settings.language !== 'auto' ? 'Respond in ' + state.settings.language + '.' : '';
+  const prompt = `Describe what is visible on this webpage screenshot for a user who cannot see it. Mention layout, key elements, and readable text. ${STYLE_INSTRUCTIONS.concise} ${lang} Plain text only.`;
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.settings.model)}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: 'image/png', data: base64 } }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 256 }
+    })
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const d = await res.json(); if (d && d.error && d.error.message) msg = d.error.message; } catch (e) {}
+    throw new Error(`[${res.status}] ${msg}`);
+  }
+  const data = await res.json();
+  const text = (data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts)
+    ? data.candidates[0].content.parts.map(p => p.text || '').join('').trim()
+    : '';
+  if (!text) throw new Error('Empty response from model');
+  return text;
+}
+
+// ---------- Read page aloud ----------
+function readPageAloud() {
+  const text = (state.page && state.page.contentSnippet) ? state.page.contentSnippet : '';
+  if (!text) { setStatus('No page text available. Scan first.'); return; }
+  if (!window.speechSynthesis) { setStatus('Speech not supported.'); return; }
+  window.speechSynthesis.cancel();
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const chunks = [];
+  let current = '';
+  for (const s of sentences) {
+    if ((current + s).length > 180) {
+      if (current) chunks.push(current.trim());
+      current = s;
+    } else {
+      current += ' ' + s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  const voices = window.speechSynthesis.getVoices();
+  chunks.forEach((c, i) => {
+    const u = new SpeechSynthesisUtterance(c);
+    if (state.settings.voiceName) {
+      const v = voices.find(x => x.name === state.settings.voiceName);
+      if (v) u.voice = v;
+    }
+    u.rate = state.settings.rate || 1;
+    u.pitch = state.settings.pitch || 1;
+    if (i === chunks.length - 1) u.onend = () => setStatus('Finished reading page.');
+    window.speechSynthesis.speak(u);
+  });
+  setStatus('Reading page…');
+}
+
 // ---------- Utilities ----------
 async function copyText(text) {
   if (!text) return;
@@ -553,6 +656,7 @@ function clearResults() {
   state.search = '';
   $('filterInput').value = '';
   $('badge').textContent = '0';
+  try { chrome.action.setBadgeText({ text: '' }); } catch (e) {}
   $('actionsList').innerHTML = '<li class="empty-state">Click \'Scan\' to analyze the current page.</li>';
   $('chipRow').innerHTML = '';
   $('summaryContainer').style.display = 'none';
