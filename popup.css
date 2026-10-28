@@ -146,6 +146,18 @@ header {
 .primary-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -4px rgba(59, 130, 246, 0.55); }
 .primary-btn:active { transform: translateY(1px); }
 .primary-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.primary-btn.loading .btn-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-spinner { display: none; }
+.primary-btn.loading .btn-label { display: none; }
+.primary-btn.loading .btn-spinner { display: inline-block; }
 
 /* Status */
 .status-indicator {
@@ -286,6 +298,7 @@ header {
   transition: background 0.15s, transform 0.15s, border-color 0.15s;
 }
 .action-item:hover { background: rgba(255,255,255,0.08); transform: translateX(2px); border-color: rgba(59,130,246,0.3); }
+.action-item:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .action-item.disabled { opacity: 0.5; }
 .item-row {
   display: flex;

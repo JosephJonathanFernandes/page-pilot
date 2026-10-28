@@ -159,6 +159,24 @@ function bindUI() {
     }
   });
 
+  $('actionsList').addEventListener('keydown', (e) => {
+    const items = Array.from($('actionsList').querySelectorAll('.action-item'));
+    if (!items.length) return;
+    const idx = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = idx < 0 ? 0 : (idx + 1) % items.length;
+      items[next].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = idx <= 0 ? items.length - 1 : idx - 1;
+      items[prev].focus();
+    } else if (e.key === 'Enter' && idx >= 0) {
+      e.preventDefault();
+      items[idx].click();
+    }
+  });
+
   $('copySummaryBtn').addEventListener('click', () => copyText(state.summary));
   $('speakSummaryBtn').addEventListener('click', () => { if (state.summary) readAloud(state.summary); });
   $('visualBtn').addEventListener('click', visualSummary);
@@ -267,7 +285,7 @@ async function getCurrentTab() {
 async function scan() {
   const btn = $('scanPage');
   btn.disabled = true;
-  btn.style.opacity = '0.8';
+  btn.classList.add('loading');
   setStatus('Scanning active tab…');
 
   const tab = await getCurrentTab();
@@ -275,7 +293,7 @@ async function scan() {
 
   chrome.tabs.sendMessage(tab.id, { action: 'scan' }, async (response) => {
     btn.disabled = false;
-    btn.style.opacity = '1';
+    btn.classList.remove('loading');
 
     if (chrome.runtime.lastError) {
       setStatus('Cannot scan this page. Try refreshing.');
@@ -339,7 +357,7 @@ async function scan() {
 function finishScanError(msg) {
   const btn = $('scanPage');
   btn.disabled = false;
-  btn.style.opacity = '1';
+  btn.classList.remove('loading');
   setStatus(msg);
 }
 
@@ -383,6 +401,7 @@ function renderElements() {
     const li = document.createElement('li');
     li.className = 'action-item' + (item.disabled ? ' disabled' : '');
     li.title = 'Click to highlight on page';
+    li.tabIndex = 0;
 
     const row = document.createElement('div');
     row.className = 'item-row';
@@ -476,11 +495,16 @@ async function makeApiCall(key, model, prompt) {
       generationConfig: { temperature: 0.4, maxOutputTokens: 256 }
     })
   };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  opts.signal = controller.signal;
   try {
     return await fetch(url, opts);
   } catch (e) {
     await new Promise(r => setTimeout(r, 500));
-    return fetch(url, opts);
+    return fetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
   }
 }
 

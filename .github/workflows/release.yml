@@ -1,0 +1,20 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create extension zip
+        run: |
+          zip -r page-pilot.zip . -x "*.git*" "node_modules/*" "*.md" "package*.json" ".eslintrc.json"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-pilot
+          path: page-pilot.zip
