@@ -162,7 +162,9 @@ function bindUI() {
   $('copySummaryBtn').addEventListener('click', () => copyText(state.summary));
   $('speakSummaryBtn').addEventListener('click', () => { if (state.summary) readAloud(state.summary); });
   $('visualBtn').addEventListener('click', visualSummary);
+  $('retrySummaryBtn').addEventListener('click', retrySummary);
   $('stopSpeakBtn').addEventListener('click', stopSpeaking);
+  $('copyListBtn').addEventListener('click', copyElementList);
   $('readPageBtn').addEventListener('click', readPageAloud);
 
   $('filterInput').addEventListener('input', (e) => { state.search = e.target.value.trim().toLowerCase(); renderElements(); });
@@ -631,6 +633,28 @@ async function copyText(text) {
   } catch (e) {
     setStatus('Copy failed.');
   }
+}
+
+async function retrySummary() {
+  if (!state.elements.length) { setStatus('Nothing to summarize.'); return; }
+  setStatus('Regenerating summary…');
+  try {
+    const summary = await generateSummary(state.elements, state.page);
+    state.summary = summary;
+    $('summaryText').textContent = summary;
+    $('summaryContainer').style.display = 'block';
+    setStatus('Scan complete.');
+    if (state.settings.voiceEnabled) readAloud(summary);
+    saveLastScan();
+  } catch (err) {
+    setStatus('AI error: ' + (err && err.message ? err.message : err));
+  }
+}
+
+function copyElementList() {
+  if (!state.elements.length) { setStatus('Nothing to copy.'); return; }
+  const text = state.elements.map(e => `[${e.type}] ${e.text}`).join('\\n');
+  copyText(text);
 }
 
 function exportJson() {
