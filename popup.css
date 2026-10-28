@@ -462,4 +462,33 @@ input[type="number"] { width: 100%; }
 .footer-note { font-size: 0.7rem; color: var(--muted); }
 
 /* Utility */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox-row input { accent-color: var(--accent); }
+
+/* Light theme overrides */
+body.light {
+  --bg: #f8fafc;
+  --bg-2: #eef2ff;
+  --panel: rgba(255,255,255,0.7);
+  --panel-solid: #ffffff;
+  --text: #0f172a;
+  --muted: #475569;
+  --border: rgba(0,0,0,0.08);
+  --accent-soft: rgba(59,130,246,0.1);
+}
+body.light {
+  background: linear-gradient(145deg, #f8fafc 0%, #eef2ff 100%);
+}
+body.light .primary-btn { box-shadow: 0 6px 16px -4px rgba(59,130,246,0.35); }
+body.light .input-field, body.light .filter-input { background: rgba(0,0,0,0.04); color: var(--text); }
+body.light .results-container, body.light .panel { background: var(--panel); }
+
 .hidden { display: none !important; }

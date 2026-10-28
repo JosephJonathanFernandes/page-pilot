@@ -137,12 +137,16 @@
 
     const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
 
+    const mainRoot = document.querySelector('main, article, [role="main"]') || document.body;
+    const pageText = (mainRoot.innerText || mainRoot.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 1800);
+
     const page = {
       title: (document.title || '').trim(),
       url: location.href,
       description: metaDesc.trim().slice(0, 240),
       headings,
-      formsCount: document.forms ? document.forms.length : 0
+      formsCount: document.forms ? document.forms.length : 0,
+      contentSnippet: pageText
     };
 
     return { page, elements: unique.slice(0, 120) };

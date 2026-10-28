@@ -14,6 +14,7 @@
         <h1>Page Pilot</h1>
       </div>
       <div class="header-actions">
+        <button id="themeBtn" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">◐</button>
         <label class="toggle" title="Toggle voice feedback">
           <span class="toggle-label">Voice</span>
           <span class="switch">
@@ -45,6 +46,7 @@
         <div class="section-actions">
           <button id="copySummaryBtn" class="mini-btn" title="Copy summary">Copy</button>
           <button id="speakSummaryBtn" class="mini-btn" title="Speak summary">Speak</button>
+          <button id="stopSpeakBtn" class="mini-btn" title="Stop speaking">Stop</button>
         </div>
       </div>
       <p id="summaryText"></p>
@@ -128,6 +130,21 @@
       <div class="field-group">
         <label for="highlightDurationInput">Highlight duration (ms)</label>
         <input id="highlightDurationInput" class="input-field" type="number" min="500" max="10000" step="100" value="2500">
+      </div>
+
+      <div class="field-group">
+        <label for="themeSelect">Theme</label>
+        <select id="themeSelect" class="input-field">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="checkbox-row">
+          <input type="checkbox" id="autoScanToggle">
+          <span>Auto-scan when popup opens</span>
+        </label>
       </div>
     </section>
 

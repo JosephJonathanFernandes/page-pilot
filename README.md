@@ -1,16 +1,21 @@
 # Page Pilot — Read-Only Assistant
 
+[![Lint](https://github.com/JosephJonathanFernandes/page-pilot/actions/workflows/lint.yml/badge.svg)](https://github.com/JosephJonathanFernandes/page-pilot/actions/workflows/lint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A Chrome extension (Manifest V3) that scans the current page's interactive elements and produces a concise, speakable summary using Google Gemini.
 
 ## Features
-- Scans visible interactive elements (links, buttons, inputs, selects, tabs, etc.)
+- Scans visible interactive elements (links, buttons, inputs, selects, tabs, menus, etc.)
 - AI summary of page purpose and available actions (Gemini)
-- Text-to-speech with configurable voice, rate, and pitch
+- Text-to-speech with configurable voice, rate, pitch, and stop control
 - Click any element to highlight it on the page
 - Filter by type and search
 - Export scan as JSON
-- Recent scan history
+- Recent scan history + restore last scan
+- Auto-scan option, dark/light theme
 - Local fallback summary when no API key / offline
+- Keyboard shortcut: `Ctrl+Enter` to scan
 - Settings stored locally (API key, model, style, voice)
 
 ## Install (developer mode)
@@ -23,3 +28,12 @@ A Chrome extension (Manifest V3) that scans the current page's interactive eleme
 - `activeTab`: scan the active tab on demand
 - `storage`: store settings and history locally
 - Host access to `generativelanguage.googleapis.com` for Gemini calls
+
+## Development
+```bash
+node --check popup.js
+node --check content.js
+```
+
+## License
+MIT

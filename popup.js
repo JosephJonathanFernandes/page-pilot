@@ -12,7 +12,9 @@ const state = {
     rate: 1.0,
     pitch: 1.0,
     maxElements: 80,
-    highlightDuration: 2500
+    highlightDuration: 2500,
+    autoScan: false,
+    theme: 'dark'
   },
   elements: [],
   page: null,
@@ -73,8 +75,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindUI();
   populateVoices();
   syncSettingsUI();
+  applyTheme();
   updateApiKeyBanner();
   renderHistory();
+  restoreLastScan();
+  if (state.settings.autoScan) setTimeout(scan, 200);
 });
 
 function bindUI() {
@@ -89,6 +94,7 @@ function bindUI() {
   $('closeSettings').addEventListener('click', () => togglePanel('settings', false));
   $('historyBtn').addEventListener('click', () => togglePanel('history'));
   $('closeHistory').addEventListener('click', () => togglePanel('history', false));
+  $('themeBtn').addEventListener('click', toggleTheme);
 
   $('openSettingsLink').addEventListener('click', () => togglePanel('settings', true));
 
@@ -134,8 +140,26 @@ function bindUI() {
     saveSettings();
   });
 
+  $('themeSelect').addEventListener('change', (e) => {
+    state.settings.theme = e.target.value;
+    applyTheme();
+    saveSettings();
+  });
+  $('autoScanToggle').addEventListener('change', (e) => {
+    state.settings.autoScan = e.target.checked;
+    saveSettings();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      scan();
+    }
+  });
+
   $('copySummaryBtn').addEventListener('click', () => copyText(state.summary));
   $('speakSummaryBtn').addEventListener('click', () => { if (state.summary) readAloud(state.summary); });
+  $('stopSpeakBtn').addEventListener('click', stopSpeaking);
 
   $('filterInput').addEventListener('input', (e) => { state.search = e.target.value.trim().toLowerCase(); renderElements(); });
   $('exportBtn').addEventListener('click', exportJson);
@@ -160,6 +184,8 @@ function syncSettingsUI() {
   $('rateValue').textContent = Number(state.settings.rate).toFixed(1);
   $('maxElementsInput').value = state.settings.maxElements;
   $('highlightDurationInput').value = state.settings.highlightDuration;
+  $('themeSelect').value = state.settings.theme || 'dark';
+  $('autoScanToggle').checked = !!state.settings.autoScan;
   populateVoices();
 }
 
@@ -201,6 +227,23 @@ function togglePanel(name, force) {
 function updateApiKeyBanner() {
   const banner = $('apiKeyBanner');
   banner.style.display = state.settings.apiKey ? 'none' : 'flex';
+}
+
+function applyTheme() {
+  const theme = state.settings.theme || 'dark';
+  document.body.classList.toggle('light', theme === 'light');
+}
+
+function toggleTheme() {
+  state.settings.theme = (state.settings.theme === 'light') ? 'dark' : 'light';
+  applyTheme();
+  saveSettings();
+  if ($('themeSelect')) $('themeSelect').value = state.settings.theme;
+}
+
+function stopSpeaking() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  setStatus('Speech stopped.');
 }
 
 function setStatus(msg) {
@@ -268,6 +311,7 @@ async function scan() {
       setStatus('Scan complete.');
       if (state.settings.voiceEnabled) readAloud(summary);
       saveHistoryEntry(tab, summary, elements.length);
+      saveLastScan();
     } catch (err) {
       const fallback = localSummary(state.page, elements);
       state.summary = fallback;
@@ -276,6 +320,7 @@ async function scan() {
       setStatus('AI error: ' + (err && err.message ? err.message : err) + ' (showing local summary)');
       if (state.settings.voiceEnabled) readAloud(fallback);
       saveHistoryEntry(tab, fallback, elements.length);
+      saveLastScan();
     }
   });
 }
@@ -381,6 +426,7 @@ Page title: "${(page && page.title) || 'Untitled'}"
 URL: ${(page && page.url) || ''}
 Page headings: ${headings}
 Forms on page: ${(page && page.formsCount) || 0}
+Page content snippet: ${(page && page.contentSnippet) ? page.contentSnippet.slice(0, 600) : 'none'}
 Interactive elements (${elements.length}):
 ${elementStrings}
 
@@ -409,14 +455,21 @@ Write a helpful spoken summary:
 }
 
 async function makeApiCall(key, model, prompt) {
-  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const opts = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.4, maxOutputTokens: 256 }
     })
-  });
+  };
+  try {
+    return await fetch(url, opts);
+  } catch (e) {
+    await new Promise(r => setTimeout(r, 500));
+    return fetch(url, opts);
+  }
 }
 
 function localSummary(page, elements) {
@@ -520,6 +573,34 @@ async function saveHistoryEntry(tab, summary, count) {
   state.history = state.history.slice(0, 12);
   await storageSet({ pp_history: state.history });
   renderHistory();
+}
+
+async function saveLastScan() {
+  try {
+    await storageSet({ pp_last_scan: { page: state.page, elements: state.elements, summary: state.summary, ts: Date.now() } });
+  } catch (e) {}
+}
+
+function restoreLastScan() {
+  storageGet(['pp_last_scan']).then(data => {
+    const s = data.pp_last_scan;
+    if (!s || !Array.isArray(s.elements) || !s.elements.length) return;
+    // only restore if recent (2 hours)
+    if (Date.now() - (s.ts || 0) > 2 * 60 * 60 * 1000) return;
+    state.elements = s.elements;
+    state.page = s.page || null;
+    state.summary = s.summary || '';
+    state.activeType = 'All';
+    state.search = '';
+    $('badge').textContent = state.elements.length;
+    renderChips();
+    renderElements();
+    if (state.summary) {
+      $('summaryText').textContent = state.summary;
+      $('summaryContainer').style.display = 'block';
+    }
+    setStatus('Restored last scan.');
+  });
 }
 
 function renderHistory() {
