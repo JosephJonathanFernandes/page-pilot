@@ -1,0 +1,13 @@
+{
+  "name": "page-pilot",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Chrome extension that scans a page and speaks a useful summary.",
+  "scripts": {
+    "lint": "eslint *.js",
+    "check": "node --check popup.js && node --check content.js && node --check background.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}
